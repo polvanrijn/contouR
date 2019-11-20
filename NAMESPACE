@@ -1,0 +1,5 @@
+exportPattern("^[[:alpha:]]+")
+importFrom("grDevices", "cairo_pdf", "colorRampPalette", "rgb")
+importFrom("graphics", "abline", "lines", "title")
+importFrom("stats", "approxfun", "df", "lm")
+importFrom("utils", "head", "read.table", "tail", "write.table")

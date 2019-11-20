@@ -1,0 +1,369 @@
+---
+title: "Shape measures"
+output:
+  html_document:
+    df_print: paged
+header-includes: \usepackage{animate}
+---
+
+In this notebook two kinds of shape measures are introduced. Measures on single words or measures on the whole sentence.
+
+## Word-wise analysis
+Before we start, we need to set the right variables; this needs to be changed to your environment if you want to run it
+
+```{r}
+base_dir = "/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/"
+pt_path = paste0(base_dir, "PitchTiers/08_manual_corrected/")
+tg_path = paste0(base_dir, "TextGrids/04_completed/")
+filenames = list.files(pt_path)
+filenames = filenames[grepl(".PitchTier", filenames)]
+library(contouR)
+```
+
+To do the word wise analysis, we need to say on which words to do the analysis on. We do this with the variable `grouping_list`. It is a list, where each item in the list represents a senctence (so in our case 30) and the indexes inside `c()` represent the number of the word in the sentence. Why exactly these three words were selected, is described in the thesis.
+
+```{r}
+grouping_list = list(
+  c(1, 2, 4), 
+  c(2, 3, 6), 
+  c(1, 2, 3),
+  c(1, 2, 4),
+  c(1, 2, 5), 
+  c(1, 2, 4), 
+  c(1, 2, 5), 
+  c(1, 2, 4), 
+  c(1, 2, 4), 
+  c(1, 2, 6), 
+  c(1, 2, 5), 
+  c(2, 3, 5), 
+  c(1, 2, 4), 
+  c(2, 3, 4),
+  c(2, 3, 5),
+  c(1, 2, 5),
+  c(1, 2, 5),
+  c(2, 3, 4),
+  c(1, 2, 5), 
+  c(1, 2, 5), 
+  c(1, 2, 4), 
+  c(1, 2, 4), 
+  c(2, 3, 4),
+  c(1, 2, 5),
+  c(2, 3, 5),
+  c(1, 2, 5),
+  c(2, 3, 5),
+  c(1, 2, 4),
+  c(2, 3, 4),
+  c(1, 2, 4)
+)
+```
+
+### Geometric Morphometrics
+The first subtype we'll cover is geometric morphometrics. The first step is align the words to eachother according to `grouping_list`. In this case, we rescale all words to be exactly equally long and contain the same points.
+
+```{r}
+superposition_list = list()
+results = superposition_by_word(
+  filenames,
+  pt_path, tg_path, grouping_list
+)
+superposition_list[[1]] = results
+head(results)
+```
+
+This procedure is a kind of superposition. It differs slightly from Procrustes superposition, since we only have 1D data (namely change in pitch over regular time intervals) and not 2D data as in x and y coordinates of a skull. Also, we do not need to rotate the shape. We only squeezed and stretched the words to be on an equal time scale. F0 scaling (on a semitone scale) was preserved. Based on these time scale normalized F0 movements, we can apply pca analysis. We also add compression rate as timing information.
+
+```{r}
+colors = c("#ce4d41", "#6ab79a", "#5e94cf", "#e7c540", "#bbbcbe", "#d27e35", "#88579f")
+labels = c("Anger", "Disgust", "Fear", "Happiness", "Neutral", "Sadness", "Surprise")
+pca_list = pca_analysis(results, title_prefix = "For all words", prefix = "w0", center = TRUE,  scale = FALSE, colors = colors, labels = labels)
+features = pca_list$features
+```
+
+We can see most variance is explained by the first PC. Also all points have a high loading on the first PC, whereas compression does not load much on PC1. To explore this PC space, I implemented a morphospace as known in morphometrics. You can take a look at it [here](morphometrics.nb.html).
+
+We can perform the same analysis, but then for each word position separate (so only the first, the second or the last word)
+
+```{r}
+group_df = t(as.data.frame(grouping_list))
+for (i in 1:3){
+  grouping_sublist = as.list(as.numeric(group_df[,i]))
+  results = superposition_by_word(
+    filenames,
+    pt_path, tg_path, grouping_sublist
+  )
+  
+  superposition_list[[i+1]] = results
+  
+  pca_list = pca_analysis(results, title_prefix = paste("For word", i), prefix = paste0("w",i), center = TRUE,  scale = FALSE, colors = colors, labels = labels)
+  features = combine_features(features, pca_list$features)
+}
+
+
+```
+
+We see in all four analysis PC1 explains most variance. PC1 is also highly correlated across all four analysis.
+
+```{r}
+library(corrplot)
+cor_df = features[, names(features) != "filename"]
+corrplot(cor(na.omit(cor_df)), method="circle", type = "upper")
+```
+
+We can perform some simple t-test to see if the first PCs significantly differ across emotions: 
+```{r}
+ext_ft = add_meta_data(features)
+for (pc in 1:2){
+  for (w in 1:3){
+    print(significance_test(features, paste0("w", w, "_PC", pc)))
+    print(significance_test(features, paste0("PC", pc, "_w0_", w)))
+  }
+}
+
+```
+
+
+### Eigenshape analysis
+Instead of cartesian coordinates, we can also do PCAs on angles. MacLeod proposes to use the phi shape function developed by Zahn and Roskies. See: https://www.palass.org/publications/newsletter/palaeomath-101/palaeomath-part-24-centre-cannot-hold-i-z-r-fourier-analysis 
+
+```{r}
+method = "Eigenshape_ZR"
+for (i in 1:length(superposition_list)){
+  df = na.omit(superposition_list[[i]])
+  results = eigenshape_analysis(df, method)
+  results$compression_rate = df$compression_rate
+  if (i == 1){
+    title_prefix = "For all words"
+  } else{
+    title_prefix = paste("For word", i-1)
+  }
+  pca_list = pca_analysis(results, title_prefix = title_prefix, prefix = paste0(method, "_w",i-1), center = TRUE,  scale = FALSE, colors = colors, labels = labels)
+  #features = combine_features(features, pca_list$features)
+}
+
+```
+
+His proposed method however does not explain much variance.
+
+We therefore implemented the method by Zahn and Roskies, MacLeod refers to. It takes the angle between the first and second point and compares this angle between the i th and i+1 th point (e.g. angle 1 - 2 vs. 2-3, 1-2 vs. 3-4, 1-2, 4-5...).
+
+```{r}
+method = "reference_angle"
+for (i in 1:length(superposition_list)){
+  df = na.omit(superposition_list[[i]])
+  results = eigenshape_analysis(df, method)
+  results$compression_rate = df$compression_rate
+  if (i == 1){
+    title_prefix = "For all words"
+  } else{
+    title_prefix = paste("For word", i-1)
+  }
+  pca_list = pca_analysis(results, title_prefix = title_prefix, prefix = paste0(method, "_w",i-1), center = TRUE,  scale = FALSE, colors = colors, labels = labels)
+  features = combine_features(features, pca_list$features)
+}
+
+```
+
+```{r}
+for (pc in 1:2){
+  for (w in 1:3){
+    print(significance_test(features, paste0("w", w, "_PC", pc)))
+    print(significance_test(features, paste0("PC", pc, "_w0_", w)))
+  }
+}
+```
+
+
+Another way is to compute the angle between succesive points. However, similar as for MacLeods approach the explained variance is rather low.
+```{r}
+method = "angle_to_angle"
+for (i in 1:length(superposition_list)){
+  df = na.omit(superposition_list[[i]])
+  results = eigenshape_analysis(df, method)
+  results$compression_rate = df$compression_rate
+  if (i == 1){
+    title_prefix = "For all words"
+  } else{
+    title_prefix = paste("For word", i-1)
+  }
+  pca_list = pca_analysis(results, title_prefix = title_prefix, prefix = paste0(method, "_w",i-1), center = TRUE,  scale = FALSE)
+}
+```
+
+```{r}
+interesting_cols = names(features)[grepl("PC", names(features))]
+cor_df = features[, interesting_cols]
+corrplot(cor(na.omit(cor_df)), method="circle", type = "upper")
+```
+
+
+## Sentence wide analysis
+Analysis can also be performed on a whole sentence
+### Frequency analysis
+Inspired by Fourier-based outline descriptions, we developed a method that applies FFT to sentences. The FFT was limited to an upper frequency of 34 Hz, since some sentences contained only 69 pitch points. Due to Nyquist, the maximum frequency is 34 Hz. We extracted the compression rate to compress the sentences to each other, the largest frequency and its amplitude. High frequencies indicate more fluctuation. This analysis was performed with `Fieldtrip` in `Matlab`. The script can be found [here](/protected/02_Scripts/Matlab/FFT_Sentdata.m). 
+
+```{r}
+mainDir='/Users/pol.van-rijn/MPI/03_archive/01_MA_thesis/'
+dataDir=paste0(mainDir,'01_Data/Preprocessed/PitchTiers/14_normalized_manually_corrected/')
+sentFile=paste0(dataDir,'sentence_wise_resamp.csv')
+
+datatab=read.csv(sentFile);
+library(dplyr)
+start_idx = which(datatab$t[2:nrow(datatab)] - datatab$t[1:(nrow(datatab)-1)] < 0) + 1
+end_idx = c(start_idx - 1, nrow(datatab))
+start_idx = c(1, start_idx)
+
+IDs = c()
+for (i in 1:length(end_idx)){
+  diff_idx = end_idx[i] - start_idx[i] + 1
+  IDs = c(IDs, rep(i, diff_idx))
+}
+datatab$ID = IDs
+
+select_columns = function(df, col){
+  return(list(df[col]))
+}
+
+padding = ceiling(max(datatab$t)) + 6
+foi = seq(0, 34, 0.25)
+
+dtM = datatab %>% filter(speaker %in% c(1,2)) %>% group_by(ID) %>% summarise(f = list(f), t = list(t))
+powspecM = frequency_analysis(dtM$f, dtM$t, padding, foi)
+
+dtF = datatab %>% filter(speaker %in% 3:4) %>% group_by(ID) %>% summarise(f = list(f), t = list(t))
+powspecF = frequency_analysis(dtF$f, dtF$t, padding, foi)
+
+
+```
+
+
+```{r}
+df = read.csv("/Users/pol.van-rijn/MPI/03_archive/02_MA_thesis/02_Scripts/Matlab/FTT_fieldtrip_features.csv")
+# combine with filenames
+files_df = read.csv("/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/PitchTiers/14_normalized_manually_corrected/filenames.csv")
+
+if (nrow(df) != nrow(files_df)){
+  stop("This may not happen!")
+}
+
+df$filename = files_df$filenames
+# Double check if all labels match
+df_test = add_meta_data(df, ID_col_name = "filename")
+df_test$speakers_rows = forcats::fct_explicit_na(df_test$speakers_rows, "NA")
+if (!(any(df_test$sentence == df_test$sent_rows) && any(df_test$emotion == df_test$emotions_rows) && any(df_test$speaker == df_test$speakers_rows))){
+  stop("This may not happen!")
+}
+
+feature = data.frame(filename = df$filename, compression_rate = df$compression_rows, peak_frequency = df$max_rows, peak_amplitude = df$t_max_rows)
+features = combine_features(features, feature)
+
+interesting_cols = c("compression_rows", "max_rows", "t_max_rows")
+cor_df = df[, interesting_cols]
+corrplot(cor(na.omit(cor_df)), method="circle", type = "upper")
+
+for (col in interesting_cols){
+  print(significance_test(df, col))
+}
+
+```
+
+Redo the same for semitones; however, very different results
+
+```{r}
+df = read.csv("/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/02_Scripts/Matlab/FTT_fieldtrip_features_st.csv")
+# combine with filenames
+files_df = read.csv("/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/PitchTiers/14_normalized_manually_corrected/filenames.csv")
+
+if (nrow(df) != nrow(files_df)){
+  stop("This may not happen!")
+}
+
+df$filename = files_df$filenames
+# Double check if all labels match
+df_test = add_meta_data(df, ID_col_name = "filename")
+df_test$speakers_rows = forcats::fct_explicit_na(df_test$speakers_rows, "NA")
+if (!(any(df_test$sentence == df_test$sent_rows) && any(df_test$emotion == df_test$emotions_rows) && any(df_test$speaker == df_test$speakers_rows))){
+  stop("This may not happen!")
+}
+
+feature = data.frame(compression_rate = df$compression_rows, peak_frequency = df$max_rows, peak_amplitude = df$t_max_rows)
+names(feature) = paste0("st_", names(feature))
+feature$filename = df$filename
+features = combine_features(features, feature)
+
+interesting_cols = c("compression_rows", "max_rows", "t_max_rows")
+cor_df = df[, interesting_cols]
+corrplot(cor(na.omit(cor_df)), method="circle", type = "upper")
+
+for (col in interesting_cols){
+  print(significance_test(df, col))
+}
+
+```
+
+### Number of harmonics
+Another approach uses the inverse FFT to reconstruct the contour with the harmonics. It succesively reconstructs the contour with an increasing amount of harmonics. Goal is it to find the minimal amount of harmonics to reconstruct the original contour within an error margin (we computed the RMSE between original and reconstruction; a reconstruction is equal if it is the same on 99% of all cases). The main idea is the smaller the amount of harmonics the less complex the contour is.
+```{r}
+df = read.csv("/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/PitchTiers/14_normalized_manually_corrected/sentence_wise_resamp_for_R.csv")
+
+results = compute_minimal_harmonics(df)
+features = combine_features(features, results)
+```
+
+
+```{r}
+interesting_cols = c("smallest_harmonic", "max_freq", "relative_harmonic")
+cor_df = results[, interesting_cols]
+corrplot(cor(na.omit(cor_df)), method="number", type = "upper")
+
+for (col in interesting_cols){
+  print(significance_test(results, col))
+}
+```
+
+
+### Fluctuation measures
+
+#### INTSINT
+Another approach uses the INSINT encoding of Hirst to count the number of reversals. The more reversals, the more complex it is.
+
+```{r}
+tg_path = paste0(base_dir, "TextGrids/05_INTSINT/")
+feature = compute_intsint_features(tg_path)
+names(feature)[2] = "stylized_INTSINT_count"
+
+tg_path = paste0(base_dir, "TextGrids/06_MOMEL_INTSINT/")
+feature$MOMEL_INTSINT_count = compute_intsint_features(tg_path)[, 2]
+features = combine_features(features, feature)
+
+for (col in c("stylized_INTSINT_count", "MOMEL_INTSINT_count")){
+  print(significance_test(features, col))
+}
+```
+
+#### Accent command from Fujisaki model
+Also the accent command from the Fujisaki can offer insights into fluctuations.
+
+```{r}
+top_scores = read.csv("top_scores.csv")
+Fujisaki_path = paste0(base_dir, "Fujisaki/")
+accent_features = compute_accent_features(top_scores, Fujisaki_path)
+names(accent_features)[1] = "filename"
+features = combine_features(features, accent_features)
+```
+
+
+```{r}
+interesting_cols = c("num_accents", "Aa_mean", "Aa_1", "Aa_last")
+cor_df = accent_features[, interesting_cols]
+corrplot(cor(na.omit(cor_df)), method="number", type = "upper")
+
+for (col in interesting_cols){
+  print(significance_test(accent_features, col))
+}
+```
+
+Finally, we can wrap the results up and save them
+
+```{r}
+write.csv(features, "shape_features.csv", row.names = FALSE)
+```

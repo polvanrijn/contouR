@@ -1,0 +1,204 @@
+---
+title: "Morphometrics"
+output:
+  html_document:
+    df_print: paged
+header-includes: \usepackage{animate}
+---
+
+## Word-wise analysis
+Set the right variables, needs to be changed to your environment
+
+```{r}
+base_dir = "/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/"
+pt_path = paste0(base_dir, "PitchTiers/08_manual_corrected/")
+tg_path = paste0(base_dir, "TextGrids/04_completed/")
+filenames = list.files(pt_path)
+filenames = filenames[grepl(".PitchTier", filenames)]
+library(contouR)
+```
+
+`grouping_list` is a list, where each item in the list represents a senctence (so in our case 30) and the indexes inside `c()` represent the number of the word in the sentence.
+
+```{r}
+grouping_list = list(
+  c(1, 2, 4), 
+  c(2, 3, 6), 
+  c(1, 2, 3),
+  c(1, 2, 4),
+  c(1, 2, 5), 
+  c(1, 2, 4), 
+  c(1, 2, 5), 
+  c(1, 2, 4), 
+  c(1, 2, 4), 
+  c(1, 2, 6), 
+  c(1, 2, 5), 
+  c(2, 3, 5), 
+  c(1, 2, 4), 
+  c(2, 3, 4),
+  c(2, 3, 5),
+  c(1, 2, 5),
+  c(1, 2, 5),
+  c(2, 3, 4),
+  c(1, 2, 5), 
+  c(1, 2, 5), 
+  c(1, 2, 4), 
+  c(1, 2, 4), 
+  c(2, 3, 4),
+  c(1, 2, 5),
+  c(2, 3, 5),
+  c(1, 2, 5),
+  c(2, 3, 5),
+  c(1, 2, 4),
+  c(2, 3, 4),
+  c(1, 2, 4)
+)
+```
+
+### Geometric Morphometrics
+Align the words to eachother according to `grouping_list`. In this case, we take all words together.
+
+```{r}
+superposition_list = list()
+results = superposition_by_word(
+  filenames,
+  pt_path, tg_path, grouping_list
+)
+superposition_list[[1]] = results
+head(results)
+```
+
+Now apply pca analysis to the aligned words.
+
+```{r}
+pca_list = pca_analysis(results, title_prefix = "For all words", prefix = "w0", center = TRUE,  scale = FALSE)
+features = pca_list$features
+```
+
+
+Plot some extreme values
+
+```{r}
+row_idxs = c()
+pc1 = pca_list$pca$x[,1]
+pc2 = pca_list$pca$x[,2]
+row_idxs = c(row_idxs, head(which(pc1 == max(pc1), 1)))
+row_idxs = c(row_idxs, head(which(pc1 == min(pc1), 1)))
+plot_morphospace(pca_list, results, row_idxs)
+```
+
+Let's take a look at the word nesterd in sentence 1 for speaker DF.
+
+```{r}
+results = add_meta_data(results)
+
+row_idxs = c(which(results$speaker =="DF" & results$sentence == 1  & results$label == "nesterd"))
+colors = c("#00bd9d", "#12ce76", "#2f96d9", "#9d54b2", "#f2c62f", "#e97f2c", "#eb4c3e")
+labels = results[row_idxs, "emotion"]
+# by default comparing to the PC origin
+plot_morphospace(pca_list, results, row_idxs, colors = colors, labels = labels, title = "PCA morphospace 'nestered' speaker 'DF'")
+
+```
+
+We can also use another baseline shape, e.g. the 5th row
+
+```{r}
+# compare to specific row
+plot_morphospace(pca_list, results, row_idxs, baseline_row_idx = 5, colors = colors, labels = labels, title = "PCA morphospace 'nestered' speaker 'DF'")
+
+```
+
+However, in this case, it makes more sense to take the neutral condition as a baseline:
+
+```{r}
+NEU_row_idx = row_idxs[which(labels == "NEU")]
+plot_morphospace(pca_list, results, row_idxs, baseline_row_idx = NEU_row_idx, colors = colors, labels = labels, title = "PCA morphospace 'nestered' speaker 'DF'")
+```
+
+
+Plot some extreme values
+
+```{r}
+SUR_row_idx = row_idxs[which(labels == "SUR")]
+ANG_row_idx = row_idxs[which(labels == "ANG")]
+row_idxs = c(NEU_row_idx, ANG_row_idx)
+plot_point_to_morphospace(results, row_idxs)
+row_idxs = c(NEU_row_idx, SUR_row_idx)
+plot_point_to_morphospace(results, row_idxs)
+```
+
+We can do the same for each word position separate (the first, second and last word)
+
+```{r}
+group_df = t(as.data.frame(grouping_list))
+for (i in 1:3){
+  grouping_sublist = as.list(as.numeric(group_df[,i]))
+  results = superposition_by_word(
+    filenames,
+    pt_path, tg_path, grouping_sublist
+  )
+  
+  superposition_list[[i+1]] = results
+  
+  pca_list = pca_analysis(results, title_prefix = "For all words", prefix = paste0("w",i), center = TRUE,  scale = FALSE)
+  features = combine_features(features, pca_list$features)
+}
+
+
+```
+
+PC1 across all four analysis is highly correlated
+
+```{r}
+library(corrplot)
+cor_df = features[, names(features) != "filename"]
+corrplot(cor(na.omit(cor_df)), method="circle", type = "upper")
+```
+
+Let's do some significance tests
+```{r}
+ext_ft = add_meta_data(features)
+for (pc in 1:2){
+  for (w in 1:3){
+    print(significance_test(features, paste0("w", w, "_PC", pc)))
+    print(significance_test(features, paste0("PC", pc, "_w0_", w)))
+  }
+}
+
+```
+
+
+### Eigenshape analysis
+
+```{r}
+# filename = filenames[1]
+# pt = read_PitchTier(paste0(pt_path, filename))
+# interpolate = approxfun(pt$t, pt$f)
+# len_pt = length(pt$t)
+# sample_len = min(pt$t[2:len_pt] - pt$t[1:(len_pt - 1)])
+# t = seq(min(pt$t), max(pt$t), sample_len)
+# f = interpolate(t)
+# f2<-fourier2(cbind(t, f),100)
+# if2<-ifourier2(f2$ao,f2$an,f2$bn,200,20,thetao=f2$thetao)
+# layout(matrix(c(1,2),1,2))
+# plot(if2$X, if2$Y, type="l", asp=1, xlab="X", ylab="Y",main="harmonics 0 to 20")
+# plot(f2$t, f2$phi, type="l", lwd=2, col="grey70", xlab="Curvilinear abscissa", ylab = "Tangent angle", main="Variation of tangent angle")
+# lines(if2$angle, if2$phi)
+```
+
+```{r}
+# results = x_y_to_phi(
+#   filenames,
+#   method = "reference",
+#   pt_path, tg_path, grouping_list
+# )
+```
+
+## Sentence wide analysis
+### Number of harmonics
+Another approach uses the inverse FFT to reconstruct the contour with the harmonics. It succesively reconstructs the contour with an increasing amount of harmonics. Goal is it to find the minimal amount of harmonics to reconstruct the original contour within an error margin (we computed the RMSE between original and reconstruction; a reconstruction is equal if it is the same on 99% of all cases). The main idea is the smaller the amount of harmonics the less complex the contour is.
+```{r}
+df = read.csv("/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/PitchTiers/14_normalized_manually_corrected/sentence_wise_resamp_for_R.csv")
+
+results = compute_minimal_harmonics(df)
+```

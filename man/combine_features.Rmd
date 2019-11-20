@@ -1,0 +1,157 @@
+---
+title: "Combine features"
+output:
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r}
+library(contouR)
+shape_features = read.csv("shape_features.csv")
+slope_features = read.csv("slope_features.csv")
+distribution_features = read.csv("distribution_features.csv")
+
+all_features = combine_features(shape_features, slope_features)
+all_features = combine_features(all_features, distribution_features)
+```
+
+
+Remove some features
+
+```{r}
+all_features = all_features[, !grepl('RMSE', names(all_features))] # remove pseudo features
+all_features = all_features[, !grepl('angle_to_angle', names(all_features))] # remove pseudo features
+all_features = all_features[,  names(all_features) != 'sd'] # remove pseudo features
+```
+
+
+```{r}
+meta_df = data.frame(filename = all_features$filename)
+meta_df = add_meta_data(meta_df)
+all_features = all_features[!grepl('name', names(all_features))] # remove columns containing the word 'name'
+# remove meta data, BUT keep emotion
+
+# What happens if we explude EAC?
+NA_cols = c("EAC")
+print(paste(nrow(all_features) - nrow(na.omit(all_features[, !names(all_features) %in% NA_cols])), "rows contain NAs if we exclude", paste(NA_cols, collapse = ", ")))
+
+# What happens if we also explude phrase_T0, phrase_reg_slope and phrase_naive_slope?
+NA_cols = c(NA_cols, "phrase_T0", "phrase_reg_slope", "phrase_naive_slope")
+print(paste(nrow(all_features) - nrow(na.omit(all_features[, !names(all_features) %in% NA_cols])), "rows contain NAs if we exclude", paste(NA_cols, collapse = ", ")))
+
+all_features = all_features[!names(all_features) %in% c("speaker", "sentence_ID", "sentence", "EAC", "phrase_T0", "phrase_reg_slope", "phrase_naive_slope")]
+
+interesting_cols = names(all_features)[names(all_features) != "emotion"]
+
+print(paste(length(interesting_cols), "features remain:", paste(interesting_cols, collapse = ", ")))
+```
+
+
+```{r}
+first = TRUE
+for (col in interesting_cols){
+  str_formula = as.formula(paste(col, "~ emotion"))
+  wc_test = data.frame(ggpubr::compare_means(str_formula, data = all_features))
+  if (first){
+    count_df = data.frame(group1 = wc_test$group1, group2 = wc_test$group2,  count  = as.numeric(wc_test$p.signif != "ns"))
+    first = FALSE
+  } else {
+    if (all(wc_test$group1 == count_df$group1) & all(wc_test$group2 == count_df$group2)){
+      count_df$count = count_df$count + as.numeric(wc_test$p.signif != "ns")
+    }
+  }
+}
+
+count_df$count = count_df$count/length(interesting_cols)
+```
+
+```{r}
+plot_significant_emotion_heatmap = function(data_set_name){
+  # Plot heat map of emotion X emotion number of significantly different
+  #min_count = min(count_df$count)
+  min_count = 0
+  max_count = 1
+  library(ggplot2)
+  ggplot(count_df, aes(y=group1, x=group2, fill=count)) + geom_tile(colour="white", width=.9, height=.9) +
+    theme_minimal() +  scale_fill_gradientn(
+      colours=colorRampPalette(c("#e7f0fa", "#c9e2f6", "#95cbee", "#0099dc", "#4ab04a", "#ffd73e"))(10),
+      limits=c(min_count, max_count),
+      breaks=seq(min_count, max_count, length=2),
+      na.value=rgb(246, 246, 246, max=255),
+      labels=floor(seq(min_count, max_count, length=2)),
+      guide=guide_colourbar(ticks=T, nbin=50, barheight=.5, label=T, barwidth=10)
+    ) +
+    theme(
+      legend.position=c(.5, -.25),
+      legend.direction="horizontal",
+      legend.text=element_text(colour="grey20"),
+      plot.margin=grid::unit(c(.5,.5,3,.5), "cm"),
+      panel.grid=element_blank(),
+      axis.text.y=element_text(size=10, family="Helvetica"),
+      axis.text.x=element_text(size=10),
+      title=element_text(family="Helvetica"),
+    ) +
+    ggtitle(paste("Significant Wilcoxon tests between emotions for", data_set_name)) +
+    xlab("Emotions") +
+    ylab("Emotions")
+  
+  # if (!is.null(save_as)){
+  #   ggsave(save_as)
+  # }
+}
+
+#plot_significant_emotion_heatmap("new dynamic features", save_as="new_features.pdf")
+print(plot_significant_emotion_heatmap("new dynamic features"))
+```
+
+Do the same for **eGeMAPS**
+
+```{r}
+eGeMAPS = read.csv("eGeMAPS.csv")
+eGeMAPS$emotion = eGeMAPS$emotions
+# remove meta data
+eGeMAPS = eGeMAPS[, c(1:88, 93)]
+interesting_cols = names(eGeMAPS)[names(eGeMAPS) != "emotion"]
+
+first = TRUE
+for (col in interesting_cols){
+  str_formula = as.formula(paste(col, "~ emotion"))
+  wc_test = data.frame(ggpubr::compare_means(str_formula, data = eGeMAPS))
+  if (first){
+    count_df = data.frame(group1 = wc_test$group1, group2 = wc_test$group2,  count  = as.numeric(wc_test$p.signif != "ns"))
+    first = FALSE
+  } else {
+    if (all(wc_test$group1 == count_df$group1) & all(wc_test$group2 == count_df$group2)){
+      count_df$count = count_df$count + as.numeric(wc_test$p.signif != "ns")
+    }
+  }
+}
+count_df$count = count_df$count/length(interesting_cols)
+
+```
+
+```{r}
+#plot_significant_emotion_heatmap("baseline eGeMAPS", save_as="eGeMaps_features.pdf")
+print(plot_significant_emotion_heatmap("baseline eGeMAPS"))
+```
+
+Merge both files
+
+```{r}
+all_features = all_features[!names(all_features) == "emotion"]
+eGeMAPS = eGeMAPS[, 1:88]
+freq = c(1:10, 31:32, 41:58)
+energy = c(11:20, 33:36, 88)
+spec = c(21:30, 37:40, 59:81)
+duration = 82:87
+eGeMAPS = eGeMAPS[, c(freq, energy, spec, duration)]
+eGeMAPS$filename = read.csv("eGeMAPS.csv")$filename
+all_features$filename = meta_df$filename
+features = combine_features(eGeMAPS, all_features)
+write.csv(features, "combined_features.csv", row.names = FALSE)
+```
+
+
+

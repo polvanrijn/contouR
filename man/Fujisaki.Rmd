@@ -1,0 +1,90 @@
+---
+title: "Fujisaki"
+output: html_notebook
+---
+
+Set the right variables and load the package
+```{r}
+base_dir = "/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/"
+Fujisaki_path = paste0(base_dir, "Fujisaki/")
+pt_path = paste0(base_dir, "PitchTiers/08_manual_corrected/")
+library(contouR)
+```
+
+The first step is to convert the PitchTiers into f0_ascii files.
+
+```{r}
+files = list.files(pt_path)
+files = files[grepl(".PitchTier", files)]
+if (!dir.exists(Fujisaki_path)){
+  dir.create(Fujisaki_path)
+}
+
+for (pt_name in files){
+  pt = read_PitchTier(paste0(pt_path, pt_name))
+  filename = strsplit(pt_name, "\\.")[[1]][1]
+  write_f0_ascii(pt$t, pt$f, paste0(Fujisaki_path, filename, ".f0_ascii"))
+}
+
+```
+
+Now convert the f0_ascii to the PAC files with `interpolate.exe` by Mixdorff. What I recommend to do is to use a Windows VM (I used Windows 10) and setup SSH.
+
+
+You can run this by running the following command on Windows
+```{cmd}
+@echo off & setlocal
+
+cd Z:\01_Data\Preprocessed\Fujisaki\
+for /r %%i in (*.f0_ascii) do (
+	cd Z:\02_Scripts\Bash
+	for /f "tokens=1 delims=." %%a in ("%%i") do (
+	  interpolation %%a%.f0_ascii 0 4 1e-006 auto 2
+	)
+)
+```
+
+
+In the next step, we'll look at the optimal alpha and beta values. This is done with `explore_ft_space`.
+
+```{r}
+top_scores = explore_ft_space(Fujisaki_path, pt_path, plot = FALSE)
+write.csv(top_scores, "top_scores.csv", row.names = FALSE)
+```
+
+## Phrase command
+
+From these optimal hyper parameter combinations we can compute features on the phrase command
+
+```{r}
+top_scores = read.csv("top_scores.csv")
+phrase_features = compute_phrase_features(top_scores, Fujisaki_path)
+head(phrase_features)
+```
+
+We see that both slope computations (and also the RMSE) are highly correlated. Also we find a negative correlation between the amplitude and the slope
+
+```{r}
+library(corrplot)
+corrplot(cor(na.omit(phrase_features[, 3:8])), method="circle", type = "upper")
+```
+
+## Visualization
+```{r}
+plot_optimal_estimation("SL_DIS_VX1b", pt_path, Fujisaki_path)
+```
+
+
+## Accent command
+With the following command we can check the accent command
+
+```{r}
+accent_features = compute_accent_features(top_scores, compute_accent_features)
+head(accent_features)
+```
+
+The correlation plot reveals that the amplitude of the first accent component is positively correlated with the last compontent.
+
+```{r}
+corrplot(cor(na.omit(accent_features[, 2:5])), method="circle", type = "upper")
+```

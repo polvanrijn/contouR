@@ -1,0 +1,45 @@
+---
+title: "Distributions"
+output:
+  html_document:
+    df_print: paged
+---
+
+First set some variables
+
+```{r}
+pt_path = "/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/PitchTiers/08_manual_corrected/"
+pt_file_names = list.files(pt_path)
+pt_file_names = pt_file_names[grepl(".PitchTier", pt_file_names)]
+
+library(contouR)
+```
+
+Now get the distributions, we'll compute skewness, kurtosis, entropy and standard deviation
+
+```{r}
+results = compute_distribution_features(pt_file_names, pt_path)
+head(results) # Let's have a look at the first 6
+```
+
+We can visualize some correlations
+```{r}
+library(corrplot)
+corrplot(cor(results[, 2:5]), method="circle", type = "upper")
+```
+
+Show some boxplots
+```{r}
+results$filename = results$name
+
+interesting_columns = names(results)[2:5]
+for (col in interesting_columns){
+  print(significance_test(na.omit(results), col))
+}
+```
+
+Now we need to save the features
+
+```{r}
+write.csv(results, "distribution_features.csv", row.names = FALSE)
+```

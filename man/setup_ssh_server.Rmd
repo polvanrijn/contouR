@@ -1,0 +1,55 @@
+---
+title: "Setup Windows SSH server"
+author: "<a href='mailto:pol.van-rijn@ae.mpg.de'>Pol van Rijn</a>"
+date: "Last updated on: `r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+---
+<script src="https://pol.works/R/hide_long_output.js"></script>
+<link rel="stylesheet" type="text/css" href="https://pol.works/R/hide_output.css">
+
+You need to have a Windows computer that is accessable over the SSH protocol. I know this solution is far from perfect, but based on the documentation of Mixdorff, I could not reimplement his algorithm in R. We therefore need to setup a Windows server.
+
+**Step 1** The first step is to do download [VirtualBox](https://www.virtualbox.org) a free virtual machine software and install Windows 10.
+
+**Step 2** After installation, you'll need to open `Manage optional features`
+
+<img src="images/Optional_features.PNG">
+
+
+**Step 3** Make sure you have `OpenSSH` installed. If not, simply click  `Add a feature` and install it.
+
+<img src="images/OpenSSH_Server.PNG">
+
+**Step 4** Open `Services`, you can do this by typing `Services` into the search bar next to the Windows icon
+
+<img src="images/Service.PNG">
+
+**Step 5** Find `OpenSSH SSH Server` and right click it and hit `Properties`. Make sure startup type is `Automatic` and the service is running.
+
+<img src="images/Advanced.PNG">
+
+
+**Step 6** Shut down your virtual machine and go to your settings.
+
+<img src="images/VM_settings.png">
+
+Head over to your network settings and click on `Port Forwarding`
+
+<img src="images/Network_settings.png">
+
+Change the following values
+* *red* the name of your forward, e.g. `SSH`
+* *green* host IP `127.0.0.1`
+* *blue* port of host (so not you're virtual machine) `2222` (I would recommend not to pick `22`)
+* *purple* port of guest (i.e. virtual machine) `22`
+
+<img src="images/Port_forwarding.png">
+
+**Step 7** Reboot your computer (you don't need to login). Test it, now open up a terminal on your normal computer and run:
+
+```
+ssh usernameWindowsVM@127.0.0.1 -p 2222
+```
+

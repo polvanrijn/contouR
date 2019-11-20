@@ -1,0 +1,119 @@
+---
+title: "Slope measures"
+author: "Pol van Rijn"
+output: html_document
+---
+
+```{r}
+base_dir = "/Users/pol/owncloud/HiWi_folder/02_running_projects/02_MA_thesis/01_Data/Preprocessed/"
+pt_path = paste0(base_dir, "PitchTiers/08_manual_corrected/")
+Fujisaki_path = paste0(base_dir, "Fujisaki/")
+library(contouR)
+```
+
+## Linear regression slope compared
+Compute slopes by drawing a linear regression line. Let's first get an intuition by looking at the first 5 slopes.
+
+```{r}
+files = list.files(pt_path)
+files = files[grepl(".PitchTier", files)]
+compute_regression_slopes(files[1:5], pt_path, plot_only=TRUE)
+```
+
+Now compute the slopes for all files:
+
+```{r}
+features = compute_regression_slopes(files, pt_path)
+head(features)
+```
+
+Let's check the correlations. The regression intercept correlates strongly with the naive intercept. There is also a smaller positive correlation between naive and regression slope. However, it is not correlated with the slope between global minimum and maximum.
+
+```{r}
+library(corrplot)
+interesting_columns = 2:9
+interesting_columns = names(features)[interesting_columns]
+cor_df = features[, interesting_columns]
+print(corrplot(cor(na.omit(cor_df)), method="number", type = "upper"))
+
+```
+
+```{r}
+features$filename = features$name
+features = add_meta_data(features)
+
+interesting_columns = c("a", "naive_slope", "b", "naive_intercept")
+for (col in interesting_columns){
+  print(significance_test(na.omit(features), col))
+}
+```
+
+## Phrase command
+From these optimal hyper parameter combinations we can compute features on the phrase command
+
+```{r}
+top_scores = read.csv("top_scores.csv")
+phrase_features = compute_phrase_features(top_scores, Fujisaki_path)
+names(phrase_features) = c("name",  "num_phrases", "Ap", "phrase_T0", "phrase_reg_slope", "phrase_reg_RMSE", "phrase_naive_slope", "phrase_naive_RMSE")
+head(phrase_features)
+features = combine_features(features, phrase_features, key = 'name')
+```
+
+We see that both slope computations (and also the RMSE) are highly correlated. Also we find a negative correlation between the amplitude and the slope
+
+```{r}
+corrplot(cor(na.omit(phrase_features[, 3:8])), method="circle", type = "upper")
+```
+
+An visualize the features in boxplots:
+
+```{r}
+phrase_features$filename = phrase_features$name
+interesting_columns = names(phrase_features)[c(2:5, 7)]
+for (col in interesting_columns){
+  print(significance_test(na.omit(phrase_features), col))
+}
+```
+
+## ICCs
+We can also devide the contour in it's ICCs. Let's first give some examples for the ICC separation:
+
+```{r}
+compute_EAC_ICCs(files[1:5], pt_path, plot_only=TRUE)
+```
+
+We can now extract the features from the ICC as Mirjana Rajkovic, Jovicic, Grozdic, Zdravkovic and Subotic (2018) propose
+
+```{r}
+feature = compute_EAC_ICCs(files, pt_path)
+head(feature)
+features = combine_features(features, feature, key = 'name')
+```
+
+We can have a look at the correlations:
+
+```{r}
+# Many
+feature$filename = feature$name
+cor_df = feature[, names(feature)[2:10]]
+corrplot(cor(na.omit(cor_df)), method="circle", type = "upper")
+cor_df = feature[, names(feature)[2:11]]
+corrplot(cor(na.omit(cor_df)), method="circle", type = "upper")
+
+```
+
+An visualize the features in boxplots:
+
+```{r}
+interesting_columns = names(feature)[2:11]
+for (col in interesting_columns){
+  print(significance_test(na.omit(feature), col))
+}
+```
+
+Last but not least, we have to save the features in a CSV for later use:
+
+```{r}
+write.csv(features, "slope_features.csv", row.names = FALSE)
+```
+

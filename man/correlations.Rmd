@@ -1,0 +1,252 @@
+---
+title: "Correlations and multicollinearity"
+output: html_notebook
+---
+
+This script checks for mutlicollinearity and correlations across all features. This needs to be removed in order to perform a multinomial regression.
+
+First load the features:
+
+```{r}
+features = read.csv("combined_features.csv")
+```
+
+Now create a function to create the heatmaps
+```{r}
+create_correlation_heatmap = function(df, labels, NA_cols = c(), title = NULL, type = "correlation"){
+  NA_cols = c(NA_cols, "filename") # also remove filename for the correlation matrix
+  df = df[, !names(df) %in% NA_cols]
+  print(paste(nrow(df) - nrow(na.omit(df)), "rows were removed"))
+  if (type == "correlation"){
+    corr_df = cor(na.omit(df))
+  } else if (type == "partial_correlation"){
+    library(corpcor)
+    corr_df = as.data.frame(cor2pcor(cov(na.omit(df)))) # Compute Partial Correlation from Correlation Matrix
+    row.names(corr_df) = names(df)
+    names(corr_df) = names(df)
+  } else {
+    stop("Type not supported")
+  }
+  library(rstatix)
+  corr_df = corr_df %>% cor_gather()
+  corr_df$cor = abs(corr_df$cor)
+  
+  if (length(labels) != ncol(df)){
+    stop("Same number of labels as names in DF!")
+  }
+  
+  # Make them to factors, so they don't change position
+  corr_df$var1 = factor(corr_df$var1, levels = names(df))
+  corr_df$var2 = factor(corr_df$var2, levels = names(df))
+  
+  colors = c("#00bd9d", "#12ce76", "#2f96d9", "#9d54b2", "#f2c62f", "#e97f2c", "#eb4c3e")
+  
+  if (length(unique(labels)) > length(colors)){
+    stop("To many labels")
+  } else{
+    colors = colors[1:length(unique(labels))]
+  }
+  
+  
+  names = unique(corr_df$var1)
+  names = factor(names, levels = names)
+  
+  fill = factor(labels, levels = unique(labels))
+  #fill = labels
+  
+  heatmap = ggplot(corr_df, aes(y=var1, x=var2, fill=cor)) + 
+    labs(x = "features", y = "features", fill = "Absolute correlation") +
+    geom_point(aes(color=factor(rep(fill, length(fill)), levels = unique(fill))), alpha=0) +
+    geom_tile(colour="white") + 
+    theme_minimal() + 
+    theme(
+      axis.title.y = element_blank(),
+      axis.title.x = element_blank(),
+      axis.text.x=element_blank(),
+      axis.ticks.x=element_blank(),
+      axis.text.y=element_blank(),
+      axis.ticks.y=element_blank(),
+      panel.border=element_blank(),
+      panel.grid=element_blank(),
+      plot.margin=unit(c(0, 0,0,0),"cm")
+    ) + 
+    scale_color_manual("Measures", values=colors, drop=FALSE) +
+    scale_fill_gradient(low = "white", high = "black") +
+    guides(color = guide_legend(override.aes = list(alpha=1)))
+
+  if (is.null(title)){
+    padding_top = 10
+    padding_left = 10
+  } else{
+    heatmap = heatmap +  ggtitle(title)
+    padding_top = 20
+    padding_left = 15
+  }
+  
+  y_annotate = ggplot(data.frame(y = names, x = 0, fill = fill), aes(y=y, x =x, fill=fill)) + 
+    geom_tile(colour="white") +
+    cowplot::theme_nothing() +
+    theme(
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      legend.position = "none",
+      panel.border=element_blank(),
+      panel.grid=element_blank(),
+      plot.margin=unit(c(0,.5,0,0),"cm")
+    ) + 
+    scale_fill_manual(values=colors)
+    
+  
+  x_annotate = ggplot(data.frame(x = names, y = 0, fill = fill), aes(x=x, y =y, fill=fill)) + 
+    geom_tile(colour="white") +
+    cowplot::theme_nothing() +
+    theme(
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      legend.position = "none",
+      panel.border=element_blank(),
+      panel.grid=element_blank(),
+      plot.margin=unit(c(0, 4.2, 0, 0.1),"cm")
+    ) +
+    coord_cartesian(ylim = c(0, 0)) +
+    scale_fill_manual(values=colors)
+  
+  print(cowplot::plot_grid(y_annotate, heatmap, NULL, x_annotate, align = 'h', rel_widths = c(1, padding_top), rel_heights = c(10, 1)))
+}
+```
+
+Some variables contain many NAs. How many columns remain, if we remove them?
+```{r}
+library(tidyverse)
+freq_df = data.frame(feature_name = names(features), num_NAs = as.numeric(map(features, ~sum(is.na(.)))))
+freq_df[order(freq_df$num_NAs, decreasing = TRUE), ]
+
+```
+
+Create a heatmap of the correlations between the variables and the partial correlations
+```{r}
+new_ft_idxs = 90:151
+labels = c(rep("shape", 40), rep("slope", 15), rep("distribution", 3))
+#create_correlation_heatmap(features[,new_ft_idxs], labels, NA_cols, paste("Correlations without", paste(NA_cols, collapse = ", ")))
+create_correlation_heatmap(features[,new_ft_idxs], labels, NA_cols, "Correlations between new features")
+```
+
+```{r}
+create_correlation_heatmap(features[,new_ft_idxs], labels, NA_cols, "Partial correlations between new features", type="partial_correlation")
+
+```
+
+
+Which variables correlate a lot?
+```{r}
+corr_df = cor(na.omit(features[, !names(features) %in% c(NA_cols, "filename")]))
+bool_mat = as.data.frame(abs(corr_df) > 0.5)
+features_high_corr = data.frame(features = names(bool_mat)[new_ft_idxs], correlation = ((as.numeric(map(bool_mat, ~sum(.)))[new_ft_idxs])))
+
+# Count the correlations:
+
+ggplot(features_high_corr) + 
+  geom_bar(aes(x=features, y=correlation, group=features), stat="identity", fill="#1cb89b") + 
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  ggtitle(paste0("Counts absolute correlations > .5 (counts with maximum is total features - 1: ", ncol(bool_mat) - 1,")"))
+```
+
+
+
+
+Correlations across baseline + new features
+```{r}
+labels = c(rep("eGeMAPS frequency", 30), rep("eGeMAPS energy", 15), rep("eGeMAPS spectrum", 37), rep("eGeMAPS duration", 6), rep("shape", 40), rep("slope", 15), rep("distribution", 3))
+
+label_lookup = data.frame(labels = labels, features = names(features)[!names(features) %in% c("filename", NA_cols)])
+
+create_correlation_heatmap(features, labels, NA_cols = NA_cols, title = "Correlations between variables in corpus")
+```
+
+```{r}
+create_correlation_heatmap(features, labels, NA_cols = NA_cols, type = "partial_correlation", title = "Partial correlation")
+```
+
+```{r}
+features_to_inspect = features[, !names(features) %in% c(NA_cols, "emotion", "filename")]
+emotion = as.numeric(meta_df$emotion)
+class_df = as.data.frame(sapply(features_to_inspect, class))
+class_df$var = row.names(class_df)
+names(class_df)[1] = "class"
+
+for (col in dplyr::filter(class_df, class=="integer")$var){
+  features_to_inspect[[col]] = as.numeric(features_to_inspect[[col]])
+}
+library(mctest)
+X = as.matrix(features_to_inspect)
+omcdiag(X, emotion)
+```
+
+
+```{r}
+results = imcdiag(X,emotion)
+vif_table = as.data.frame(results$idiags)
+vif_table$feature = row.names(vif_table)
+vif_table = vif_table[order(vif_table$VIF, decreasing = TRUE), ]
+```
+
+
+```{r}
+imcdiag(X[,  names(features_to_inspect) %in% c(vif_table[140:146, "feature"], "F0semitoneFrom27.5Hz_sma3nz_amean", "F0semitoneFrom27.5Hz_sma3nz_stddevNorm", "loudness_sma3_amean", "VoicedSegmentsPerSec", "hammarbergIndexV_sma3nz_amean", "alphaRatioV_sma3nz_amean", "slopeV500.1500_sma3nz_amean")], emotion)
+imcdiag(X[,  names(features_to_inspect) %in% vif_table[126:146, "feature"]], emotion)
+```
+
+Mutlicolinearity in Banse & Scherer features:
+
+```{r}
+imcdiag(X[,  names(features_to_inspect) %in% c("F0semitoneFrom27.5Hz_sma3nz_amean", "F0semitoneFrom27.5Hz_sma3nz_stddevNorm", "loudness_sma3_amean", "VoicedSegmentsPerSec", "hammarbergIndexV_sma3nz_amean", "alphaRatioV_sma3nz_amean", "slopeV500.1500_sma3nz_amean")], emotion)
+imcdiag(X[,  names(features_to_inspect) %in% c("F0semitoneFrom27.5Hz_sma3nz_amean", "F0semitoneFrom27.5Hz_sma3nz_stddevNorm", "loudness_sma3_amean", "VoicedSegmentsPerSec", "hammarbergIndexV_sma3nz_amean", "slopeV500.1500_sma3nz_amean")], emotion)
+```
+
+
+
+```{r}
+ft_glm = features_to_inspect
+ft_glm$emotion = meta_df$emotion
+library(randomForest)
+fit_rf = randomForest(emotion~., data=na.omit(ft_glm))
+important_params = as.data.frame(importance(fit_rf))
+important_params$features = row.names(important_params)
+row.names(important_params) = NULL
+important_params = important_params[order(important_params$MeanDecreaseGini, decreasing = TRUE), ]
+head(important_params, n = 50)
+```
+
+```{r}
+features_by_importance = important_params$features
+
+# initially include all
+vif_table = as.data.frame(imcdiag(X[,  features_by_importance], emotion)$idiags)
+vif_table$feature = row.names(vif_table)
+vif_table = vif_table[order(vif_table$VIF, decreasing = TRUE), ]
+
+continue = TRUE
+
+while (continue){
+  print(paste("remove", vif_table$feature[1]))
+  features_by_importance = features_by_importance[features_by_importance != vif_table$feature[1]]
+  vif_table = as.data.frame(imcdiag(X[,  names(features_to_inspect) %in% features_by_importance], emotion)$idiags)
+  vif_table$feature = row.names(vif_table)
+  vif_table = vif_table[order(vif_table$VIF, decreasing = TRUE), ]
+  
+  if (!length(which(vif_table$Klein == 1))  > 3){
+    print("Model converged")
+    continue = FALSE
+  }
+}
+
+#imcdiag(X[,  names(features_to_inspect) %in% important_params$features], emotion)
+
+
+```
+
+```{r}
+
+```
+

@@ -1,0 +1,10 @@
+Package: contouR
+Type: Package
+Title: Compute dynamic features on pitch contours
+Version: 0.1.0
+Author: Pol van Rijn
+Maintainer: Pol van Rijn <pol.van-rijn@ae.mpg.de>
+Description: This package bundles tools to do dynamic measurements on pitch contours. It bundles methods from phonology (e.g. Fujisaki model) and morphometry.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
