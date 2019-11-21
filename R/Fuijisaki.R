@@ -633,7 +633,7 @@ plot_optimal_estimation = function(
   return(p)
 }
 
-compute_phrase_feature = function(alpha, beta, file, Fujisaki_path){
+compute_phrase_feature = function(alpha, beta, file, Fujisaki_path, plot = FALSE){
   # Compute the phrase
   pac_list = read_pac_file(paste0(Fujisaki_path, file, '.PAC'))
 
