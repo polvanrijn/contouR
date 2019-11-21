@@ -682,7 +682,16 @@ compute_phrase_feature = function(alpha, beta, file, Fujisaki_path, plot = FALSE
     naive_RMSE = NA
   }
 
-  return(data.frame(name, num_phrases, Ap, T0, reg_slope, reg_RMSE, naive_slope, naive_RMSE))
+  return(data.frame(
+    name = file,
+    num_phrases = num_phrases,
+    Ap = Ap,
+    T0 = T0,
+    reg_slope = reg_slope,
+    reg_RMSE = reg_RMSE,
+    naive_slope = naive_slope,
+    naive_RMSE = naive_RMSE
+  ))
 }
 
 compute_phrase_features = function(top_scores, Fujisaki_path, plot = FALSE){
