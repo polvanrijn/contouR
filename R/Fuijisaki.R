@@ -633,6 +633,57 @@ plot_optimal_estimation = function(
   return(p)
 }
 
+compute_phrase_feature = function(alpha, beta, file, Fujisaki_path){
+  # Compute the phrase
+  pac_list = read_pac_file(paste0(Fujisaki_path, file, '.PAC'))
+
+  # Feature 1
+  num_phrases = length(pac_list$phrase_idxs)
+
+  phrase_df = pac_list$df[pac_list$phrase_idxs, ]
+
+  # Feature 2
+  Ap = mean(phrase_df$A)
+
+  if (num_phrases == 1){
+    # Feature 3
+    T0 = phrase_df[['T1']]
+    phrase = get_phrase_contour(force_alpha = alpha, pac_list = pac_list)
+
+    n_xs = length(phrase)
+    xs = 1:n_xs
+
+    # Feature 4: regression slope
+    lin_model = lm(phrase ~ xs)
+    reg_slope = lin_model$coefficients[[2]]
+    reg_RMSE = sqrt(mean(lin_model$residuals^2))
+    if (plot){
+      plot(phrase)
+      abline(lin_model)
+      title(paste("RMSE linear regression slope:", reg_RMSE))
+    }
+
+    # Feature 5: naive slope
+    intercept = phrase[1]
+    naive_slope = (phrase[n_xs] - phrase[1])/(n_xs - 1)
+    y_values = intercept + naive_slope*xs
+    naive_RMSE = RMSE(y_values, phrase, remove_NA = FALSE)
+    if (plot){
+      plot(phrase)
+      lines(y_values)
+      title(paste("RMSE naive slope:", naive_RMSE))
+    }
+
+  } else {
+    T0 = NA
+    reg_slope = NA
+    reg_RMSE = NA
+    naive_slope = NA
+    naive_RMSE = NA
+  }
+
+  return(data.frame(name, num_phrases, Ap, T0, reg_slope, reg_RMSE, naive_slope, naive_RMSE))
+}
 
 compute_phrase_features = function(top_scores, Fujisaki_path, plot = FALSE){
   #' Compute features on phrase command
@@ -646,58 +697,9 @@ compute_phrase_features = function(top_scores, Fujisaki_path, plot = FALSE){
   place_1 = place_1[, c(1,2,4)]
 
   results = NULL
-  for (row in 1:nrow(place_1)){
-    # Compute the phrase
-    name = as.character(place_1[row, 3])
-    pac_list = read_pac_file(paste0(Fujisaki_path, name, '.PAC'))
-
-    # Feature 1
-    num_phrases = length(pac_list$phrase_idxs)
-
-    phrase_df = pac_list$df[pac_list$phrase_idxs, ]
-
-    # Feature 2
-    Ap = mean(phrase_df$A)
-
-    if (num_phrases == 1){
-      # Feature 3
-      T0 = phrase_df[['T1']]
-      alpha = place_1[[row, c(1)]]
-      phrase = get_phrase_contour(force_alpha = alpha, pac_list = pac_list)
-
-      n_xs = length(phrase)
-      xs = 1:n_xs
-
-      # Feature 4: regression slope
-      lin_model = lm(phrase ~ xs)
-      reg_slope = lin_model$coefficients[[2]]
-      reg_RMSE = sqrt(mean(lin_model$residuals^2))
-      if (plot){
-        plot(phrase)
-        abline(lin_model)
-        title(paste("RMSE linear regression slope:", reg_RMSE))
-      }
-
-      # Feature 5: naive slope
-      intercept = phrase[1]
-      naive_slope = (phrase[n_xs] - phrase[1])/(n_xs - 1)
-      y_values = intercept + naive_slope*xs
-      naive_RMSE = RMSE(y_values, phrase, remove_NA = FALSE)
-      if (plot){
-        plot(phrase)
-        lines(y_values)
-        title(paste("RMSE naive slope:", naive_RMSE))
-      }
-
-    } else {
-      T0 = NA
-      reg_slope = NA
-      reg_RMSE = NA
-      naive_slope = NA
-      naive_RMSE = NA
-    }
-
-    results = rbind(results, data.frame(name, num_phrases, Ap, T0, reg_slope, reg_RMSE, naive_slope, naive_RMSE))
+  for (r in 1:nrow(place_1)){
+    row = place_1[r, ]
+    results = rbind(results, compute_phrase_feature(row$alpha, row$beta, row$file, Fujisaki_path))
   }
 
   return(results)
