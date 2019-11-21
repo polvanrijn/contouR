@@ -416,6 +416,60 @@ compute_optimal_hyper_parameter = function(
   return(plot_df)
 }
 
+optimize_PAC = function(PAC, pt_path, Fujisaki_path, a_start, a_step, a_end, b_start, b_step, b_end, plot = FALSE){
+  # Read PitchTier
+  name = strsplit(PAC, "\\.")[[1]][1]
+  pt = read_PitchTier(paste0(pt_path, name, ".PitchTier"))
+
+  full_path = paste0(Fujisaki_path, name, '.PAC')
+  plot_df = compute_optimal_hyper_parameter(full_path, pt, a_start, a_step, a_end, b_start, b_step, b_end)
+
+  # Take the 5 best (i.e. with the lowest RMSE) beta, alpha combinations
+  top_5 = plot_df[tail(rev(order(plot_df$RMSE)), 5), ]
+  top_5$file = name
+  top_5$placement = 1:5
+
+
+  #pp("Finished", name)
+
+  if (plot){
+    # Create a heat map of the RMSEs for all beta vs. alpha combinations
+    RMSE_min = min(plot_df$RMSE)
+    RMSE_max = max(plot_df$RMSE)
+
+    cols = c(colorRampPalette(c("#e7f0fa", "#c9e2f6", "#95cbee", "#0099dc", "#4ab04a", "#ffd73e"))(10), colorRampPalette(c("#eec73a", "#e29421", "#e29421", "#f05336","#ce472e"), bias=2)(90))
+
+    requireNamespace("scales")
+    requireNamespace("ggplot2")
+    library(ggplot2)
+    ggplot(plot_df, aes(y=alpha, x=beta, fill=RMSE)) +
+      geom_tile(colour="white", width=.9, height=.9) +
+      theme_minimal() +
+      scale_fill_gradientn(colours=cols,
+                           limits=c(RMSE_min, RMSE_max),
+                           breaks=seq(RMSE_min, RMSE_max, length=2),
+                           na.value=rgb(246, 246, 246, max=255),
+                           labels=floor(seq(RMSE_min, RMSE_max, length=2)),
+                           guide=guide_colourbar(ticks=T, nbin=50, barheight=.5, label=T, barwidth=10)
+      ) +
+      theme(legend.position=c(.5, -.13),
+            legend.direction="horizontal",
+            legend.text=element_text(colour="grey20"),
+            plot.margin=grid::unit(c(.5,.5,2,.5), "cm"),
+            panel.grid=element_blank(),
+            axis.text.y=element_text(size=10, family="Helvetica"),
+            axis.text.x=element_text(size=10),
+            title=element_text(family="Helvetica"),
+      ) +
+      ggtitle(paste("RSME for different hyper parameters", name))
+
+    # Due to the amount of plots, they will be saved
+    ggsave(paste0("heatmap_", name, ".pdf"))
+  }
+
+  return(top_5)
+}
+
 explore_ft_space = function(
   Fujisaki_path, pt_path,
   plot = TRUE,
@@ -446,55 +500,7 @@ explore_ft_space = function(
   # Empty df for scores
   top_scores = NULL
   for (PAC in files){
-    # Read PitchTier
-    name = strsplit(PAC, "\\.")[[1]][1]
-    pt = read_PitchTier(paste0(pt_path, name, ".PitchTier"))
-
-    full_path = paste0(Fujisaki_path, name, '.PAC')
-    plot_df = compute_optimal_hyper_parameter(full_path, pt, a_start, a_step, a_end, b_start, b_step, b_end)
-
-    # Take the 5 best (i.e. with the lowest RMSE) beta, alpha combinations
-    top_5 = plot_df[tail(rev(order(plot_df$RMSE)), 5), ]
-    top_5$file = name
-    top_5$placement = 1:5
-    top_scores = rbind(top_scores, top_5)
-
-    #pp("Finished", name)
-
-    if (plot){
-      # Create a heat map of the RMSEs for all beta vs. alpha combinations
-      RMSE_min = min(plot_df$RMSE)
-      RMSE_max = max(plot_df$RMSE)
-
-      cols = c(colorRampPalette(c("#e7f0fa", "#c9e2f6", "#95cbee", "#0099dc", "#4ab04a", "#ffd73e"))(10), colorRampPalette(c("#eec73a", "#e29421", "#e29421", "#f05336","#ce472e"), bias=2)(90))
-
-      requireNamespace("scales")
-      requireNamespace("ggplot2")
-      library(ggplot2)
-      ggplot(plot_df, aes(y=alpha, x=beta, fill=RMSE)) +
-        geom_tile(colour="white", width=.9, height=.9) +
-        theme_minimal() +
-        scale_fill_gradientn(colours=cols,
-                             limits=c(RMSE_min, RMSE_max),
-                             breaks=seq(RMSE_min, RMSE_max, length=2),
-                             na.value=rgb(246, 246, 246, max=255),
-                             labels=floor(seq(RMSE_min, RMSE_max, length=2)),
-                             guide=guide_colourbar(ticks=T, nbin=50, barheight=.5, label=T, barwidth=10)
-        ) +
-        theme(legend.position=c(.5, -.13),
-              legend.direction="horizontal",
-              legend.text=element_text(colour="grey20"),
-              plot.margin=grid::unit(c(.5,.5,2,.5), "cm"),
-              panel.grid=element_blank(),
-              axis.text.y=element_text(size=10, family="Helvetica"),
-              axis.text.x=element_text(size=10),
-              title=element_text(family="Helvetica"),
-        ) +
-        ggtitle(paste("RSME for different hyper parameters", name))
-
-      # Due to the amount of plots, they will be saved
-      ggsave(paste0("heatmap_", name, ".pdf"))
-    }
+    top_scores = rbind(top_scores, optimize_PAC(PAC, pt_path, Fujisaki_path, a_start, a_step, a_end, b_start, b_step, b_end, plot))
   }
 
   # Add meta data to top_scores
