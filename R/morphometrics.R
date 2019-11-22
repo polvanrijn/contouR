@@ -510,7 +510,7 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
     names(features)[1:2] = c(paste0(prefix, "PC1"), paste0(prefix, "PC2"))
   }
   returned_list = list(cumvar = cumvar, pca = pca, features = features)
-  if (plot & return_plots) {
+  if (return_plots) {
     returned_list$variance_plot = variance_plot
     returned_list$pca_plot = pca_plot
   }
