@@ -509,9 +509,9 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
   returned_list = list(cumvar = cumvar, pca = pca, features = features)
   if (plot & return_plots) {
     returned_list$variance_plot = variance_plot
-    returned_list$variance_plot = variance_plot
+    returned_list$pca_plot = pca_plot
   }
-  return(list(cumvar = cumvar, pca = pca, features = features))
+  return(returned_list)
 }
 
 plot_morphospace = function(pca_list, results, row_idxs,
