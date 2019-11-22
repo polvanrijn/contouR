@@ -402,7 +402,7 @@ plot_shape_function = function(xs, ys, angles, method,
 }
 
 # Methods on combined measures
-pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, prefix = "", center = TRUE, compression_rate_col = "compression_rate", colors = c(), labels = c()){
+pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, prefix = "", center = TRUE, compression_rate_col = "compression_rate", colors = c(), labels = c(), return_plots = FALSE){
   if (!compression_rate_col %in% names(results)){
     stop(paste("DF must contain the following column:", compression_rate_col))
   }
@@ -431,8 +431,8 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
   variance = eig*100/sum(eig)
   cumvar = cumsum(variance)
 
-  if (plot){
-    if (title_prefix != ""){
+  if (plot) {
+    if (title_prefix != "") {
       title_prefix = paste(title_prefix, "")
     }
 
@@ -445,10 +445,10 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
     library(ggbiplot)
     library(ggplot2)
     emotions = results_wo_NA$emotion
-    if (length(labels) == length(levels(emotions))){
+    if (length(labels) == length(levels(emotions))) {
       levels(emotions) = labels
     }
-    p = ggbiplot(pca, obs.scale = 1, var.scale = 1, groups = emotions,
+    pca_plot = ggbiplot(pca, obs.scale = 1, var.scale = 1, groups = emotions,
                  ellipse = FALSE, circle = FALSE, varname.size=0, var.axes = F) +
 
       #geom_point(aes(colour=emotions), size = 1) +
@@ -456,10 +456,11 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
       theme_minimal() +
       theme(legend.title = element_blank())
     if (length(colors) == length(levels(emotions))){
-      p = p + scale_color_manual(values=colors)
+      pca_plot = pca_plot + scale_color_manual(values=colors)
     }
-
-    print(p)
+    if (plot & !return_plots) {
+      print(pca_plot)
+    }
     # print(
     #   ggplot(pc_df) +
     #                 geom_point(aes(x = PC1, y = PC2, colour=emotions), size = 1) +
@@ -478,15 +479,17 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
     most_variance = most_variance[most_variance > threshold]
     variance_df = data.frame(value=as.numeric(most_variance), name = names(most_variance))
     variance_df$name = factor(variance_df$name, levels = variance_df$name)
-    print(
-      ggplot(variance_df) +
-        geom_bar(aes(x=name, y = value), fill="#02a3dd", stat = "identity") +
-        theme_minimal() +
-        theme(axis.text.x = element_text(angle = 90)) +
-        ggtitle(paste0(title_prefix, "Contribution of each variable to PC1 (explains ", PC1_variance, " % of all variance)")) +
-        xlab(paste("All variables contributing more than", threshold)) +
-        ylab("Contributions of the variables")
-    )
+    variance_plot = ggplot(variance_df) +
+      geom_bar(aes(x=name, y = value), fill="#02a3dd", stat = "identity") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90)) +
+      ggtitle(paste0(title_prefix, "Contribution of each variable to PC1 (explains ", PC1_variance, " % of all variance)")) +
+      xlab(paste("All variables contributing more than", threshold)) +
+      ylab("Contributions of the variables")
+
+    if (plot & !return_plots) {
+      print(variance_plot)
+    }
   }
   if (prefix != ""){
     prefix = paste0(prefix, "_")
@@ -502,6 +505,11 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
   } else {
     features = data.frame(PC1 = pca$x[,1],PC2 = pca$x[,2], filename = filenames)
     names(features)[1:2] = c(paste0(prefix, "PC1"), paste0(prefix, "PC2"))
+  }
+  returned_list = list(cumvar = cumvar, pca = pca, features = features)
+  if (plot & return_plots) {
+    returned_list$variance_plot = variance_plot
+    returned_list$variance_plot = variance_plot
   }
   return(list(cumvar = cumvar, pca = pca, features = features))
 }
@@ -900,7 +908,7 @@ frequency_analysis = function(f_list, t_list, padding, foi){
   if (length(f_list) !=  length(t_list)){
     stop("f_list and t_list must be equally long!")
   }
-  
+
   # Internal helper functions
   polyremoval = function(x){
     # Compute peudoinverse
@@ -909,64 +917,64 @@ frequency_analysis = function(f_list, t_list, padding, foi){
     beta = sum(x)*invxcov
     return(x - beta)
   }
-  
+
   hanning = function(n){
     # Taken from Matlab
     # compute taper
     N   = n+1
     tap = 0.5*(1-cos((2*pi*(1:n))/N))
-    
+
     # make symmetric
     halfn = floor(n/2)
     tap[(n+1-halfn):n] = rev(tap[1:halfn])
-    
+
     return(tap)
   }
-  
+
   # Number of frequencies of interest
   nfoi = length(foi)
-  
+
   # Number of trials
   ntrail = length(f_list)
-  
+
   # Empty array for all trials
   powspctrm = matrix(ncol = length(foi), nrow = ntrail)
-  
+
   for (itrial in 1:ntrail){
     # Get time and F0 for each trial
     f = f_list[[itrial]]
     t = t_list[[itrial]]
-    
+
     # Remove polynomial fit from the data
     f = polyremoval(f)
-    
+
     # Sample rate
     fsample = 1/mean(diff(t))
-    
+
     # Total samples
     ndatsample = length(f)
-    
+
     # Total time in seconds of input data
     dattime = ndatsample / fsample
-    
+
     # Compute padding
     postpad    = ceiling((padding - dattime) * fsample)
     endnsample = round(padding * fsample) #  total number of samples of padded data
     endtime    = padding # total time in seconds of padded data
-    
+
     freqboi = round(foi * endtime) + 1
     freqboi = unique(freqboi)
     freqoi  = (freqboi-1)/endtime; # boi - 1 because 0 Hz is included in fourier output
     nfreqboi = length(freqboi)
     nfreqoi  = length(freqoi)
-    
+
     # Compute hanning
     tap = hanning(ndatsample)
     tap  = tap / norm(as.matrix(tap), 'F')
-    
+
     # Set ntaper
     ntaper = rep(ndatsample, nfreqoi)
-    
+
     # determine phase-shift so that for all frequencies angle(t=0) = 0
     timedelay = t[1]
     if (timedelay != 0){
@@ -981,28 +989,28 @@ frequency_analysis = function(f_list, t_list, padding, foi){
     }
     # complex to real
     angletransform = as.numeric(angletransform)
-    
+
     # Empty spectrum
     spectrum = matrix(ncol = nfreqoi, nrow = ntaper)
     for (itap in 1:ndatsample){
       # Pad data and apply window
       padded_data = c(tap*f, rep(0, postpad))
-      
+
       # FFT
       dum = fft(padded_data)
-      
+
       # Select FOIs
       dum = dum[freqboi]
-      
+
       # Remove time delay
       if (timedelay != 0){
         dum = dum*exp(-1i*angletransform)
       }
-      
+
       dum = dum * sqrt(2/endnsample)
       spectrum[itap,] = dum
     }
-    
+
     # Add values to power spectrum
     for (ifoi in 1:nfoi){
       powdum = abs(spectrum[,ifoi])^2;
@@ -1011,7 +1019,7 @@ frequency_analysis = function(f_list, t_list, padding, foi){
   }
   # First frequency needs to be devided by 2
   powspctrm[,1] = powspctrm[,1]/2
-  
+
   return(powspctrm)
 }
 
