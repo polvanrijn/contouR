@@ -1,4 +1,4 @@
-superposition_by_word = function(filenames, pt_path, tg_path, grouping_list){
+superposition_by_word = function(filenames, pt_path, tier_path, grouping_list){
   # TODO
   library(stringr)
   require(dplyr)
@@ -22,20 +22,18 @@ superposition_by_word = function(filenames, pt_path, tg_path, grouping_list){
   # Check all words contain F0
   for (filename in filenames){
     print(filename)
-    print(1)
     pt = read_PitchTier(paste0(pt_path, filename))
-    print(2)
     filebase = strsplit(filename, "\\.")[[1]][1]
-    tg = read_TextGrid(paste0(tg_path, filebase, ".TextGrid"))
-    print(3)
-    tg_word_idxs = which(tg$words$label != "")
-    t1_ref = tg$words$t1[tg_word_idxs]
-    t2_ref = tg$words$t2[tg_word_idxs]
-    labels = tg$words$label[tg_word_idxs]
 
-    print(4)
+    # tg = read_TextGrid(paste0(tg_path, filebase, ".TextGrid"))
+    # tier = tg$words
+    tier = read_TextGrid_Tier(paste0(tier_path, filebase, ".csv"))
+    tg_word_idxs = which(tier$label != "")
+    t1_ref = tier$t1[tg_word_idxs]
+    t2_ref = tier$t2[tg_word_idxs]
+    labels = tier$label[tg_word_idxs]
+
     s = as.numeric(str_extract(strsplit(filebase, "_")[[1]][3], "(\\d)+"))
-    print(5)
 
     word_idxs = grouping_list[[s]]
     word_num = 0

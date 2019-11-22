@@ -123,6 +123,36 @@ read_TextGrid = function(full_path){
   return(rPraat::tg.read(full_path, 'auto'))
 }
 
+convert_tier_to_csv = function(full_path, tier_name, save_to = NULL){
+  tier = read_TextGrid(full_path)[[tier_name]]
+  path_without_ext = .check_path(full_path)
+
+  if (is.null(save_to)) {
+    csv_path = paste0(path_without_ext, '.csv')
+  } else {
+    if (dir.exists(save_to)) {
+      if (tail(strsplit(save_to, "")[[1]], 1) != "/") {
+        save_to = paste0(save_to, "/")
+      }
+      csv_path = paste0(save_to, tail(strsplit(path_without_ext, "/")[[1]], 1), '.csv')
+    }
+  }
+  df = data.frame(
+    label = tier$label,
+    t1 = tier$t1,
+    t2 = tier$t2
+  )
+  write.csv(df, csv_path, row.names = F)
+}
+
+read_TextGrid_Tier = function(full_path){
+  if (file.exists(full_path)) {
+    return(as.list(read.csv(full_path)))
+  } else{
+    stop(paste("Path", full_path, "does not exist!"))
+  }
+}
+
 .check_path = function(full_path){
   splitted_full_path = strsplit(full_path, '/')[[1]]
   filename = tail(splitted_full_path, 1)
