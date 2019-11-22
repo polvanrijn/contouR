@@ -2,7 +2,7 @@ superposition_by_word = function(filenames, pt_path, tg_path, grouping_list){
   # TODO
   library(stringr)
   require(dplyr)
-  require(factoextra)
+  #require(factoextra)
   if (!(is.list(grouping_list) && length(grouping_list) > 0)){
     stop("grouping_list needs to be a non empty list")
   } else{
