@@ -10,7 +10,7 @@ resample = function(X, num_landmarks, output = FALSE){
   if (output){
     print(paste("Downsampling from", length(X), "to", num_landmarks))
   }
-  return((X[seq(1,length(X),length=num_landmarks)])[-1])
+  return((X[seq(1, length(X), length = num_landmarks)])[-1])
 }
 
 add_meta_data = function(df, ID_col_name = "filename"){
@@ -33,10 +33,10 @@ RMSE = function(m, o, output = FALSE, remove_NA = TRUE){
   }
 
   NA_idx = rep(FALSE, length(m))
-  if (length(which(is.na(m))) > 0){
+  if (length(which(is.na(m))) > 0) {
     NA_idx = is.na(m) | NA_idx
   }
-  if (length(which(is.na(o))) > 0){
+  if (length(which(is.na(o))) > 0) {
     NA_idx = is.na(o) | NA_idx
   }
 
@@ -103,6 +103,9 @@ read_PitchTier = function(full_path, cache=TRUE){
   if (all(cache, file.exists(csv_path))) {
     return(read.csv(csv_path))
   } else {
+    if (!file.exists(full_path)) {
+      stop(paste("Path", full_path, "does not exist!"))
+    }
     loadNamespace("rPraat")
     pt = rPraat::pt.read(full_path)
     pt_df = data.frame(t = pt$t, f = pt$f)
@@ -113,14 +116,14 @@ read_PitchTier = function(full_path, cache=TRUE){
 
 read_TextGrid = function(full_path){
   .check_path(full_path)
+  if (!file.exists(full_path)) {
+    stop(paste("Path", full_path, "does not exist!"))
+  }
   loadNamespace("rPraat")
   return(rPraat::tg.read(full_path, 'auto'))
 }
 
 .check_path = function(full_path){
-  if (!file.exists(full_path)) {
-    stop(paste("Path", full_path, "does not exist!"))
-  }
   splitted_full_path = strsplit(full_path, '/')[[1]]
   filename = tail(splitted_full_path, 1)
   splitted_filename = strsplit(filename, '\\.')[[1]]
