@@ -27,32 +27,35 @@ superposition_by_word = function(filenames, pt_path, tier_path, grouping_list){
 
     # tg = read_TextGrid(paste0(tg_path, filebase, ".TextGrid"))
     # tier = tg$words
-    tier = read_TextGrid_Tier(paste0(tier_path, filebase, ".csv"))
-    tg_word_idxs = which(tier$label != "")
-    t1_ref = tier$t1[tg_word_idxs]
-    t2_ref = tier$t2[tg_word_idxs]
-    labels = tier$label[tg_word_idxs]
+    tier_full_path = paste0(tier_path, filebase, ".csv")
+    if (file.exists(tier_full_path)){
+      tier = read_TextGrid_Tier(paste0(tier_path, filebase, ".csv"))
+      tg_word_idxs = which(tier$label != "")
+      t1_ref = tier$t1[tg_word_idxs]
+      t2_ref = tier$t2[tg_word_idxs]
+      labels = tier$label[tg_word_idxs]
 
-    s = as.numeric(str_extract(strsplit(filebase, "_")[[1]][3], "(\\d)+"))
+      s = as.numeric(str_extract(strsplit(filebase, "_")[[1]][3], "(\\d)+"))
 
-    word_idxs = grouping_list[[s]]
-    word_num = 0
-    for (i in word_idxs){
-      word_num = word_num + 1
-      pt_idxs = which(pt$t >= t1_ref[i] & pt$t < t2_ref[i])
-      if (length(pt_idxs) > 1){
-        # Must contain at least two pitch points
-        duration_df = rbind(duration_df, data.frame(filename = filebase, word_idx = i, word_num = word_num, label = labels[i], duration = max(pt$t[pt_idxs]) - min(pt$t[pt_idxs]), num_points = length(pt_idxs)))
-      } else{
-        warning(paste("The word", labels[i], i, "in", filebase, "contains no F0!\n"))
-      }
+      word_idxs = grouping_list[[s]]
+      word_num = 0
+      for (i in word_idxs){
+        word_num = word_num + 1
+        pt_idxs = which(pt$t >= t1_ref[i] & pt$t < t2_ref[i])
+        if (length(pt_idxs) > 1){
+          # Must contain at least two pitch points
+          duration_df = rbind(duration_df, data.frame(filename = filebase, word_idx = i, word_num = word_num, label = labels[i], duration = max(pt$t[pt_idxs]) - min(pt$t[pt_idxs]), num_points = length(pt_idxs)))
+        } else{
+          warning(paste("The word", labels[i], i, "in", filebase, "contains no F0!\n"))
+        }
 
-      l = list(t = pt$t[pt_idxs], f = pt$f[pt_idxs], filename = filebase, label = labels[i])
+        l = list(t = pt$t[pt_idxs], f = pt$f[pt_idxs], filename = filebase, label = labels[i])
 
-      if (is.null(pts[word_num][[1]])){
-        pts[[word_num]] = list(l)
-      } else{
-        pts[[word_num]] = append(pts[[word_num]], list(l))
+        if (is.null(pts[word_num][[1]])){
+          pts[[word_num]] = list(l)
+        } else{
+          pts[[word_num]] = append(pts[[word_num]], list(l))
+        }
       }
     }
   }
@@ -452,7 +455,7 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
       levels(emotions) = labels
     }
     pca_plot = ggbiplot(pca, obs.scale = 1, var.scale = 1, groups = emotions,
-                 ellipse = FALSE, circle = FALSE, varname.size=0, var.axes = F) +
+                        ellipse = FALSE, circle = FALSE, varname.size=0, var.axes = F) +
 
       #geom_point(aes(colour=emotions), size = 1) +
       ggtitle(paste0(title_prefix, "PCA for all words together (num points: ", max(pca_col_idxs) - 1, ")")) +
