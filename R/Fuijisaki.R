@@ -327,7 +327,7 @@ write_f0_ascii = function(t, f, fname){
   #' @param fname: name of the f0_ascii file
 
   if (!grepl('.f0_ascii', fname)){
-    err0("Filename (", fname, ") needs to have the .f0_ascii extension")
+    stop(paste("File", fname, "needs to have the .f0_ascii extension"))
   }
 
   # f = f[!is.na(t)]
@@ -337,7 +337,7 @@ write_f0_ascii = function(t, f, fname){
   # f = f[!is.na(f)]
   #
   # if (any(length(t) <= 2, length(f))){
-  #   err0("Filename (", fname, ") must contain more than 2 not NA values")
+  #   stop(paste("File", fname, "must contain more than 2 not NA values"))
   # }
 
   # Important addition
@@ -430,9 +430,9 @@ optimize_PAC = function(PAC, pt_path, Fujisaki_path, a_start, a_step, a_end, b_s
   top_5$placement = 1:5
 
 
-  #pp("Finished", name)
+  #print(paste("Finished", name))
 
-  if (plot){
+  if (plot) {
     # Create a heat map of the RMSEs for all beta vs. alpha combinations
     RMSE_min = min(plot_df$RMSE)
     RMSE_max = max(plot_df$RMSE)

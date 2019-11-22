@@ -8,7 +8,7 @@
 
 resample = function(X, num_landmarks, output = FALSE){
   if (output){
-    pp("Downsampling from", length(X), "to", num_landmarks)
+    print(paste("Downsampling from", length(X), "to", num_landmarks))
   }
   return((X[seq(1,length(X),length=num_landmarks)])[-1])
 }
@@ -16,13 +16,13 @@ resample = function(X, num_landmarks, output = FALSE){
 add_meta_data = function(df, ID_col_name = "filename"){
   require(stringr)
   if (ID_col_name %in% names(df)){
-    if (!any(names(df) %in% c("speaker", "emotion", "sentence_ID"))){
+    if (!any(names(df) %in% c("speaker", "emotion", "sentence_ID"))) {
       df = cbind(df, stringr::str_split_fixed(df[[ID_col_name]], "_", 3))
-      names(df)[(ncol(df)-2):ncol(df)] = c("speaker", "emotion", "sentence_ID")
+      names(df)[(ncol(df) - 2):ncol(df)] = c("speaker", "emotion", "sentence_ID")
       df$sentence = as.numeric(stringr::str_extract(df$sentence_ID, "(\\d)+"))
     }
-  } else{
-    err0("Does not contain the column '", ID_col_name, "'")
+  } else {
+    stop(paste("Does not contain the column", ID_col_name))
   }
   return(df)
 }
@@ -44,14 +44,14 @@ RMSE = function(m, o, output = FALSE, remove_NA = TRUE){
     o = o[!NA_idx]
     m = m[!NA_idx]
     if (output){
-      pp(length(which(NA_idx)), "NAs removed!")
+      print(paste(length(which(NA_idx)), "NAs removed!"))
     }
   }
 
   rmse = sqrt(mean((m - o)^2))
 
   if (output){
-    pp("RMSE:", rsme)
+    print(paste("RMSE:", rsme))
   }
 
   return(rmse)
@@ -82,19 +82,6 @@ pp = function(..., sep = " ", collapse = NULL){
   return(print(paste(..., sep = sep, collapse = collapse)))
 }
 
-pp0 = function(..., collapse = NULL){
-  return(print(paste0(..., collapse = collapse)))
-}
-
-err0 = function(..., collapse = NULL){
-  stop(paste0(..., collapse = collapse))
-}
-
-warn0 = function(..., collapse = NULL){
-  war = paste0(..., '\n', collapse = collapse)
-  warning(war)
-}
-
 f2st = function(f){
   require(hqmisc)
   requireNamespace("hqmisc")
@@ -109,25 +96,41 @@ get_pt_list = function(pt_path, file_name){
   return(list(f_st = f_st, t = pt$t, name = name))
 }
 
+# TODO rename read_* to read.*
 read_PitchTier = function(full_path, cache=TRUE){
-  f_name = tail(strsplit(full_path, '\\/')[[1]], 1)
-  splitted_fn = strsplit(f_name, '\\.')[[1]]
-  splitted_path = strsplit(full_path, '\\.')[[1]]
-  splitted_path = paste(splitted_path[1:(length(splitted_path) - 1)], collapse = ".")
-  if (length(splitted_fn) != 2){
-    err0("Filename (", full_path, ") may only contain a single dot (.)!!!")
-  }
-  csv_path = paste0(splitted_path[1], '.csv')
-  if (all(cache, file.exists(csv_path))){
+  path_without_ext = .check_path(full_path)
+  csv_path = paste0(path_without_ext, '.csv')
+  if (all(cache, file.exists(csv_path))) {
     return(read.csv(csv_path))
-  } else{
+  } else {
     loadNamespace("rPraat")
-    library(rPraat)
-    pt = pt.read(full_path)
+    pt = rPraat::pt.read(full_path)
     pt_df = data.frame(t = pt$t, f = pt$f)
     write.csv(pt_df, csv_path, row.names = FALSE)
     return(pt_df)
   }
+}
+
+read_TextGrid = function(full_path){
+  .check_path(full_path)
+  loadNamespace("rPraat")
+  return(rPraat::tg.read(full_path, 'auto'))
+}
+
+.check_path = function(full_path){
+  if (!file.exists(full_path)) {
+    stop(paste("Path", full_path, "does not exist!"))
+  }
+  splitted_full_path = strsplit(full_path, '/')[[1]]
+  filename = tail(splitted_full_path, 1)
+  splitted_filename = strsplit(filename, '\\.')[[1]]
+  if (length(splitted_filename) > 2) {
+    stop(paste("Path", full_path, "may only contain a single dot (.)!!!"))
+  }
+  filename_without_ext = splitted_filename[1]
+
+  path_with_out_filename = paste(splitted_full_path[1:(length(splitted_full_path) - 1)], collapse = "/")
+  return(paste0(path_with_out_filename, "/", filename_without_ext))
 }
 
 get_pt_filnames = function(path){
@@ -151,17 +154,7 @@ cache_pts = function(path){
 }
 
 
-read_TextGrid = function(full_path){
-  f_name = tail(strsplit(full_path, '\\/')[[1]], 1)
-  splitted_fn = strsplit(f_name, '\\.')[[1]]
-  if (length(splitted_fn) != 2) {
-    err0("Filename (", full_path, ") may only contain a single dot (.)!!!")
-  }
 
-  loadNamespace("rPraat")
-  library(rPraat)
-  return(tg.read(full_path, 'auto'))
-}
 
 significance_test = function(df, comp_col, ref_col = "emotion", significance_test_method = "by_group", global_sig_value = TRUE){
   library(ggpubr)

@@ -41,7 +41,7 @@ superposition_by_word = function(filenames, pt_path, tg_path, grouping_list){
         # Must contain at least two pitch points
         duration_df = rbind(duration_df, data.frame(filename = filebase, word_idx = i, word_num = word_num, label = labels[i], duration = max(pt$t[pt_idxs]) - min(pt$t[pt_idxs]), num_points = length(pt_idxs)))
       } else{
-        warn0("The word '", labels[i], "' (", i, ") in ", filebase, " contains no F0!\n")
+        warning(paste("The word", labels[i], i, "in", filebase, "contains no F0!\n"))
       }
 
       l = list(t = pt$t[pt_idxs], f = pt$f[pt_idxs], filename = filebase, label = labels[i])
@@ -236,7 +236,7 @@ xyToPhi = function(xs, ys, method, move_right_to_left = FALSE){
         # E.g. -180 + -90 degrees => -270, not 90 degrees
         angle_rounded = round(angle, 1)
         if (is.na(angle_rounded)){
-          pp(ys[i+1], ys[i], xs[i+1], xs[i])
+          print(paste(ys[i+1], ys[i], xs[i+1], xs[i]))
         }
         if (abs(floor(angle_rounded)) == 180){
           # Check to flip direction

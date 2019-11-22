@@ -107,8 +107,8 @@ compute_EAC_ICCs = function(pt_file_names, pt_path, plot_only = FALSE){
       ICC_idx = 1
       for (border in ICCs_borders){
         end_idx = border
-        if (end_idx < start_idx){
-          err0("Start index(", start_idx, ") must always be >= end index (", end_idx, ")!!")
+        if (end_idx < start_idx) {
+          stop(paste("Start index", start_idx, "must always be >= end index", end_idx))
         }
 
         if (end_idx - start_idx + 1 >= min_ICCs_length){
@@ -120,7 +120,7 @@ compute_EAC_ICCs = function(pt_file_names, pt_path, plot_only = FALSE){
           ))
           ICC_idx = ICC_idx + 1
         } else{
-          warn0("ICC size to small(", end_idx - start_idx, "). Current ICC skipped")
+          warning(paste("ICC size to small", end_idx - start_idx, "SKIP current ICC"))
         }
         start_idx = end_idx + 1
       }
@@ -137,7 +137,7 @@ compute_EAC_ICCs = function(pt_file_names, pt_path, plot_only = FALSE){
       if (length(f_st) > 0){
         ICCs = data.frame(t = t, f = f_st, ICC_idx = 1)
       } else {
-        err0("The file ", file_name, " contains no pitch!")
+        stop(paste("The file", file_name, "contains no pitch!"))
       }
     }
 
