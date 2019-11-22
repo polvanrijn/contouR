@@ -21,6 +21,7 @@ superposition_by_word = function(filenames, pt_path, tg_path, grouping_list){
 
   # Check all words contain F0
   for (filename in filenames){
+    print(filename)
     pt = read_PitchTier(paste0(pt_path, filename))
     filebase = strsplit(filename, "\\.")[[1]][1]
     tg = read_TextGrid(paste0(tg_path, filebase, ".TextGrid"))
