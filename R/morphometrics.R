@@ -499,10 +499,10 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
   }
   if (length(unique(results_wo_NA$word_num)) > 1){
     PC1 = data.frame(PC1 = pca$x[,1], filename = filenames, word_num = paste0("PC1_", prefix, results_wo_NA$word_num))
-    PC1 = spread(PC1, word_num, PC1)
+    PC1 = tidyr::spread(PC1, word_num, PC1)
 
     PC2 = data.frame(PC2 = pca$x[,2], filename = filenames, word_num = paste0("PC2_", prefix, results_wo_NA$word_num))
-    PC2 = spread(PC2, word_num, PC2)
+    PC2 = tidyr::spread(PC2, word_num, PC2)
 
     features = merge(PC1, PC2, by = "filename")
   } else {
