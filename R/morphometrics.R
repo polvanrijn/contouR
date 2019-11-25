@@ -35,7 +35,15 @@ superposition_by_word = function(filenames, pt_path, tier_path, grouping_list){
       t2_ref = tier$t2[tg_word_idxs]
       labels = tier$label[tg_word_idxs]
 
-      s = as.numeric(str_extract(strsplit(filebase, "_")[[1]][3], "(\\d)+"))
+      sent_str = strsplit(filebase, "_")[[1]][3]
+      s = as.numeric(str_extract(sent_str, "(\\d)+"))
+      if (is.na(s) & nchar(sent_str) == 2) {
+        # Convert symbols to numbers
+        sent_str_split = strsplit(sent_str, "")[[1]]
+        str1 = sent_str_split[1]
+        str2 = sent_str_split[2]
+        s = (which(LETTERS == str1) - 1) * 26 + (which(LETTERS == str2))
+      }
 
       word_idxs = grouping_list[[s]]
       word_num = 0
@@ -66,7 +74,7 @@ superposition_by_word = function(filenames, pt_path, tier_path, grouping_list){
   duration_df$compression_rate = avg_dur/duration_df$duration
   num_points = median(duration_df$num_points)
   tiny_padding = 0.001 # 1 ms padding to avoid NA
-  t = seq(0, (avg_dur - 0.001), length=num_points)
+  t = seq(0, (avg_dur - 0.001), length = num_points)
 
   for (w in 1:length(pts)){
     pt_list = pts[[w]]
