@@ -487,8 +487,10 @@ pca_analysis = function(results, plot = TRUE, title_prefix="", scale = TRUE, pre
 
 
     # Display variable contributions to first PC
-    var = factoextra::get_pca_var(pca)
-    most_variance = abs(var$coord[, 1])
+    #var = factoextra::get_pca_var(pca)
+    #most_variance = abs(var$coord[, 1])
+    most_variance = (eigen(cov(pca_df))$vectors^2)[,1]
+    names(most_variance) = names(pca_df)
     threshold = .5
     most_variance = most_variance[most_variance > threshold]
     variance_df = data.frame(value=as.numeric(most_variance), name = names(most_variance))
@@ -910,7 +912,7 @@ compute_intsint_features = function(tg_path){
   results = NULL
 
   for (filename in filenames){
-    base_name = str_split(filename, "\\.")[[1]][1]
+    base_name = stringr::str_split(filename, "\\.")[[1]][1]
     tg = read_TextGrid(paste0(tg_path, filename))
     results = rbind(results, data.frame(filename = base_name, INTSINT_count = length(tg$Intsint$label)))
   }
